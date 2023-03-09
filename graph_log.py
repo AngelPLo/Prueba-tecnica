@@ -144,8 +144,8 @@ if __name__ == '__main__':
     infusion_data = np.empty([1,4])
     infusion_data_max = np.empty([1,4])
     buffer_infusion_data = np.zeros([1,4])
-    Data_units = ["a","b",
-                  "c","d"]
+    Data_units = ["-","-",
+                  "-","-"]
 
     status_change_name = []
     status_change_time = []
