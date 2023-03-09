@@ -2,11 +2,11 @@
 ## Ejecución
 Este script es apto para ser llamado desde la consola, *(o su terminal favorita)*. Para ser llamado debe ejecutarse el siguiente comando
 
-> python graph_log.py <path del archivo>
+> python graph_log.py path-del-archivo
 
 Si el archivo se encuentra en la misma carpeta, basta con escribir su nombre (del archivo [sé que no es necesario, per vale la pena aclararlo ]) sin olvidar su extensión
 
-> python graph_log.py <path del archivo>
+> python graph_log.py path-del-archivo
 
 ### Ejemplo
 
