@@ -1,12 +1,26 @@
-# Apertura de archivo y extracción de linea
-# Para ahorrar memoria se procesa cada línea 
 import argparse
+from pathlib import Path
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
-import pdb
+import os
+
 #FUNCIONES
-def graficar(time,sensor_data,sensor_names, sensor_units,infusion_data,infusion_names, infusion_units, n_infusion):
+def createFolder(fileName):
+    Name = fileName.split('\\')
+    Name = Name[len(Name)-1]
+    Name = Name.split('.')
+    Name = Name[0]
+    currentDir = os.getcwd()
+    foldername = "\\"+ Name
+    FolderPath = currentDir+foldername
+    if not os.path.exists(FolderPath):
+        os.makedirs(FolderPath, exist_ok=True)
+    return FolderPath
+
+def graficar(time,sensor_data,sensor_names, sensor_units,infusion_data,infusion_names, infusion_units, n_infusion,fileName):
+    i_color = 0;
+    colors = ['b','g','r','c','m','y','k','brown']
     t = time[1:len(time),:];
     s_data = sensor_data[1:len(sensor_data),:]
     i_data = infusion_data[1:len(infusion_data),:]
@@ -15,91 +29,147 @@ def graficar(time,sensor_data,sensor_names, sensor_units,infusion_data,infusion_
     i_names = infusion_names
     i_units = infusion_units
     
-
     sensor_data_max = np.empty([1,18])
-    infusion_data_max = np.empty([1,4])
 
-    #Normalizamos los vectores de los datos para que sean de aproximadamente el mismo tamaño
-    for i in range(18):
-        max = np.max(s_data[:,i])
-        min = np.min(s_data[:,i])
-        sensor_data_max[0,i] = max
-        if abs(min) > abs(max):
-            sensor_data_max[0,i] = abs(min)
-            
-        if sensor_data_max[0,i] == 0:
-            s_data[:,i] = s_data[:,i]*0
-            continue
-        s_data[:,i] = s_data[:,i]/sensor_data_max[0,i]
-    #Generamos un título para la gráfica y para los ejes
     temperature_title = "Temperaturas"
     motor_title = "Estados del motor"
     ADCs_rate_title = "Frecuencia de los ADC"
     infusion_tube_title = "Estado del tubo"
-    data1_title = i_names[0]
-    data2_title = i_names[1]
-    data3_title = i_names[2]
-    data4_title = i_names[3]
+
+    data_title = i_names
+
     data_figure_title = "Datos de la infusion {infusion}".format(infusion=n_infusion)
     sensor_figure_title = "Datos de sensores en la infusion {infusion}".format(infusion=n_infusion)
-    sensor_figure, ((temp, motor),(ADCs, tube)) = plt.subplots(2,2)
-    data_figure, ((data1, data2),(data3, data4)) = plt.subplots(2,2)
+
+    sensor_figure, ((internal_temp, motor),(ADCs, potencia)) = plt.subplots(2,2)
+    external_temp = internal_temp.twinx()
+    p_r = ADCs.twinx()
+
+    data_figure, preassure = plt.subplots()
+    flow = preassure.twinx()
+    temp = preassure.twinx()
+    weight = preassure.twinx()
+    weight.tick_params(bottom=False,left=True,right=False,top=False,labelbottom=False,labelleft=True,labelright=False,labeltop=False)
+    weight.yaxis.set_label_position('left')
+    temp.spines.right.set_position(("outward",70))
+    weight.spines.left.set_position(("outward",70))
+    data_plots = [preassure, flow, weight, temp]    
+    
+    current = motor.twinx()
+
     sensor_figure.suptitle(sensor_figure_title)
     data_figure.suptitle(data_figure_title)
-    temp_legends = []
-    motor_legends = []
-    ADCs_legends = []
-    tube_legends = []
-    for i in range(8):
-        multi = sensor_data_max[0,i]
-        legend = s_names[i] + " x{multiplicador}".format(multiplicador=multi)
-        temp_legends.append(legend)
-        temp.plot(t,s_data[:,i])
-    temp.legend(temp_legends)
-    temp.set_ylabel("°C")
-    temp.set_title("Temperaturas")
+
+    legends = []
+    lineas = []
+
+    for internal_temps in range(2,8):
+        legend = s_names[internal_temps] #+ " x{multiplicador}".format(multiplicador=multi)
+        lineas += internal_temp.plot(t,s_data[:,internal_temps],label=legend,color=colors[i_color])
+        i_color+=1
+
+    for external_temps in range(0,2):
+        legend = s_names[external_temps] #+ " x{multiplicador}".format(multiplicador=multi)
+        lineas += external_temp.plot(t,s_data[:,external_temps], linestyle = "dashed", label=legend,color=colors[i_color])
+        i_color+=1
+
+    i_color = 0
+    for lin in lineas:
+        legends.append(lin.get_label())
+
+    internal_temp.legend(lineas, legends)
+    internal_temp.set_ylabel("internal temps °C")
+    internal_temp.set_title("Temperaturas")
+    external_temp.set_ylabel("external temps °C \n (dashed)")
+    legends = []
+    lineas = []
     
-    for i in range(8,12):
-        multi = sensor_data_max[0,i]
-        legend = s_names[i] + " x{multiplicador}{unidades}".format(unidades=s_units[i], multiplicador=multi)
-        motor_legends.append(legend)
-        motor.plot(t,s_data[:,i])
-    motor.legend(motor_legends)
+    for sensor in [8,9]:
+        legend = s_names[sensor] + " {unidades}".format(unidades=s_units[sensor],color = colors[i_color])
+        lineas += motor.plot(t,s_data[:,sensor],label=legend)
+        i_color +=1
+    legend = s_names[11] + " {unidades}".format(unidades=s_units[11])
+    lineas += current.plot(t,s_data[:,11],linestyle = "dashed",label=legend,color=colors[i_color])
+    i_color=0
+
+    for lin in lineas:
+        legends.append(lin.get_label())
+
+    motor.legend(lineas,legends)
     motor.set_title("Estados del motor")
+    current.set_ylabel("(dashed)")
+    legends = []
+    lineas = []
+
+    for sensor in [10,12]:
+        legend = s_names[sensor] + " {unidades}".format(unidades=s_units[i_color])
+        lineas += potencia.plot(t,s_data[:,sensor],label=legend)
+        i_color +=1
     
-    for i in range(12,14):
-        multi = sensor_data_max[0,i]
-        legend = s_names[i] + " x{multiplicador}{unidades}".format(unidades=s_units[i], multiplicador=multi)
-        tube_legends.append(legend)
-        tube.plot(t,s_data[:,i])
-    tube.legend(tube_legends)
-    tube.set_title("Estado del tubo")
-    tube.set_xlabel("segundos")
+    i_color=0
+    for lin in lineas:
+        legends.append(lin.get_label())
+
+    potencia.legend(lineas, legends)
+    potencia.set_title("Potencia")
+    potencia.set_xlabel("segundos")
+    legends = []
+    lineas = []
+
+    multi = sensor_data_max[0,13]
+    legend = s_names[13]
+    lineas += p_r.plot(t,s_data[:,13], linestyle = "dashed", label=legend, color=colors[0])
+
     for i in range(14,18):
+        i_color +=1
         multi = sensor_data_max[0,i]
-        legend = s_names[i] + " x{multiplicador}".format(multiplicador=multi)
-        ADCs_legends.append(legend)
-        ADCs.plot(t,s_data[:,i])
-    ADCs.legend(ADCs_legends)
-    ADCs.set_ylabel("Hertz (1/s)")
+        legend = s_names[i] #+ " x{multiplicador}".format(multiplicador=multi)
+        lineas += ADCs.plot(t,s_data[:,i],label=legend,color = colors[i_color])
+    i_color = 0
+
+    for lin in lineas:
+        legends.append(lin.get_label())
+
+    ADCs.legend(lineas,legends)
+    ADCs.set_ylabel("ADC freq (Hertz)")
+    p_r.set_ylabel("preassure rate \n (dashed)")
     ADCs.set_title("Frecuencia de los ADC")
     ADCs.set_xlabel("segundos")
-    plt.show(block=False)
-    data1.plot(t,i_data[:,0])
-    data1.set_title(data1_title)
-    data1.set_ylabel(i_units[0])
-    data2.plot(t,i_data[:,1])
-    data2.set_ylabel(i_units[1])
-    data2.set_title(data2_title)
-    data3.plot(t,i_data[:,2])
-    data3.set_ylabel(i_units[2])
-    data3.set_title(data3_title)
-    data3.set_xlabel("segundos")
-    data4.plot(t,i_data[:,3])
-    data4.set_title(data4_title)
-    data4.set_ylabel(i_units[3])
-    data4.set_xlabel("segundos")
-    plt.show(block=True)
+
+    lineas = []
+    legends = []
+
+    folderPath = createFolder(fileName)
+    _figName = folderPath+"\\"+sensor_figure_title+".png"
+    sensor_figure.set_size_inches(19.2,10.8)
+    sensor_figure.savefig(_figName,dpi=100,format="png")
+    plt.close(sensor_figure)
+
+    data = 0
+    for plot in data_plots:
+        legend = data_title[data] + " {unidades}".format(unidades=i_units[data])
+        if data > 1 :
+            lineas += plot.plot(t,i_data[:,data],label=legend,linestyle="dashed",color=colors[data])
+            data +=1
+            continue
+        lineas += plot.plot(t,i_data[:,data],label=legend,color=colors[data])
+        data +=1
+    preassure.set_ylabel(i_names[0])
+    flow.set_ylabel(i_names[1])
+    weight.set_ylabel(i_names[2])
+    temp.set_ylabel(i_names[3])
+    i_color = 0
+
+    for lin in lineas:
+        legends.append(lin.get_label())
+
+    preassure.legend(lineas,legends)
+    preassure.set_xlabel("segundos")
+    data_figure.set_size_inches(19.2,10.8)
+    _figName = folderPath+"\\"+ data_figure_title+".png"
+    data_figure.savefig(_figName,dpi=100,format="png")
+    plt.close(data_figure)
+
 
 
 #MAIN
@@ -136,33 +206,29 @@ if __name__ == '__main__':
                     " °"," °/s",
                     " mW"," A",
                     " W"," Pa/s",
-                    " 1/s"," 1/s",
-                    " 1/s"," 1/s"]
+                    " Hz"," Hz",
+                    " Hz"," Hz"]
     #Datos
-    Data_names = ["Data1", "Data2",
-                  "Data3", "Data4"]
+    Data_names = ["Pressure", "Flow",
+                  "Weight", "Temp"]
     infusion_data = np.empty([1,4])
     infusion_data_max = np.empty([1,4])
     buffer_infusion_data = np.zeros([1,4])
-    Data_units = ["-","-",
-                  "-","-"]
+    Data_units = ["Pa","ml/s",
+                  "g","°C"]
 
-    status_change_name = []
-    status_change_time = []
-
-    status_line_style = []
     #Tiempo en segundos
     time = np.empty([1,1])
     #Número de cafés procesados
     coffee_count = 0
-    graph_data_count = 0
+
     while True:
         nl += 1;
         #Obtenemos la información del archivo linea por linea
         line = log.readline()
         #Finalizamos la lectura del registro cuando se deba
         if not line:
-            graficar(time,Sensor_data,Sensor_names,Sensor_units,infusion_data,Data_names,Data_units,coffee_count)
+            graficar(time,Sensor_data,Sensor_names,Sensor_units,infusion_data,Data_names,Data_units,coffee_count,args.name)
             break;
 
         #Separamos los parametros que conforman cada línea
@@ -177,7 +243,7 @@ if __name__ == '__main__':
         if parametros[1] == " Estoy en START\n":
 
             if coffee_count > 0:
-                graficar(time,Sensor_data,Sensor_names,Sensor_units,infusion_data,Data_names,Data_units,coffee_count)
+                graficar(time,Sensor_data,Sensor_names,Sensor_units,infusion_data,Data_names,Data_units,coffee_count,args.name)
                 Sensor_data = np.empty([1,18])
                 Sensor_data_max = np.empty([1,18])
                 infusion_data = np.empty([1,4])
@@ -253,7 +319,6 @@ if __name__ == '__main__':
 
             Sensor_data = np.vstack([Sensor_data,buffer_sensor_data])
             buffer_sensor_data = np.zeros([1,18])
-
 
     #Cerramos el archivo
     log.close()
